@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>De PSAD56 a WGS84, paso a paso</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef3f1;--card:#fff;--ink:#14242b;--mute:#5a6b72;--line:#cfdad6;--acc:#0b6e66;--accbg:#dff1ee;--codebg:#f6f9f8;
+--k:#0b6e66;--s:#9a5b13;--n:#7a3fb0;--c:#7b8a90;--f:#1c5fb5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1a1f;--card:#16252c;--ink:#e3eeee;--mute:#93a7ad;--line:#28404a;--acc:#4fd1c0;--accbg:#173a3d;--codebg:#0d181d;--k:#4fd1c0;--s:#e8b06a;--n:#c79cf0;--c:#71858c;--f:#7db3ff}}
+:root[data-theme="dark"]{--bg:#0f1a1f;--card:#16252c;--ink:#e3eeee;--mute:#93a7ad;--line:#28404a;--acc:#4fd1c0;--accbg:#173a3d;--codebg:#0d181d;--k:#4fd1c0;--s:#e8b06a;--n:#c79cf0;--c:#71858c;--f:#7db3ff}
+*,*:before,*:after{box-sizing:inherit}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(1.6rem,4.5vw,2.3rem);line-height:1.15;margin:0 0 8px;letter-spacing:-.02em}
+.lead{color:var(--mute);margin:0 0 24px;max-width:62ch}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+label{display:block;font-size:.85rem;color:var(--mute);margin-bottom:4px}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--codebg);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+button{font:inherit;font-weight:600;background:var(--acc);color:var(--bg);border:0;border-radius:8px;padding:10px 18px;cursor:pointer}
+button.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.hint{font-size:.85rem;color:var(--mute)}
+.rail{position:relative;margin-top:30px;padding-left:46px}
+.rail:before{content:"";position:absolute;left:17px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.step{position:relative;margin-bottom:22px}
+.badge{position:absolute;left:-46px;top:0;width:36px;height:36px;border-radius:50%;background:var(--acc);color:var(--bg);display:grid;place-items:center;font-weight:700}
+.step h2{font-size:1.15rem;margin:4px 0 4px}
+.step p{margin:0 0 10px;color:var(--mute)}
+.res{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;background:var(--accbg);border-radius:10px;padding:10px 14px;margin:10px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9rem}
+.res b{color:var(--acc);font-weight:600}.res span{overflow-wrap:anywhere}
+details{margin-top:8px}summary{cursor:pointer;color:var(--acc);font-weight:600;font-size:.9rem}
+pre[class*=language-]{margin:8px 0 0;padding:14px;background:var(--codebg);border:1px solid var(--line);border-radius:10px;overflow-x:auto;font:.82rem/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2}
+code[class*=language-]{font:inherit;color:var(--ink);white-space:pre}
+.token.comment{color:var(--c);font-style:italic}.token.keyword{color:var(--k);font-weight:600}
+.token.string,.token.template-string{color:var(--s)}.token.number,.token.boolean{color:var(--n)}
+.token.function{color:var(--f)}.token.operator,.token.punctuation{color:var(--mute)}
+.final{border-left:4px solid var(--acc)}
+.final h2{margin:0 0 6px}
+</style>
+</head>
+<body>
+<main>
+<h1>De PSAD56 a WGS84, paso a paso</h1>
+<p class="lead">Ingresa un punto en UTM PSAD56 y mira cada transformación con su cálculo y su código. Los parámetros por defecto son los de Perú, pero puedes cambiarlos.</p>
+
+<section class="panel" aria-label="Datos de entrada">
+<div class="grid">
+<div><label for="E">Este (m)</label><input id="E" type="number" step="any" value="277000"></div>
+<div><label for="N">Norte (m)</label><input id="N" type="number" step="any" value="8665000"></div>
+<div><label for="Z">Zona UTM</label><input id="Z" type="number" min="1" max="60" value="18"></div>
+<div><label for="H">Hemisferio</label><select id="H"><option value="S">Sur</option><option value="N">Norte</option></select></div>
+</div>
+<div class="grid" style="margin-top:12px">
+<div><label for="dX">ΔX (m)</label><input id="dX" type="number" step="any" value="-279"></div>
+<div><label for="dY">ΔY (m)</label><input id="dY" type="number" step="any" value="175"></div>
+<div><label for="dZ">ΔZ (m)</label><input id="dZ" type="number" step="any" value="-379"></div>
+</div>
+<div class="row"><button id="go">Calcular</button><button class="ghost" id="ej">Cargar ejemplo</button>
+<span class="hint">Traslación PSAD56 → WGS84 para Perú: −279, +175, −379.</span></div>
+</section>
+
+<div class="rail" id="pasos" aria-live="polite"></div>
+</main>
+
+<script>
+/* ---------- Elipsoides ---------- */
+const INT1924 = { a: 6378388, f: 1 / 297 };
+const WGS84   = { a: 6378137, f: 1 / 298.257223563 };
+
+/* ---------- Funciones (su código se muestra en cada paso) ---------- */
+function utmAGeograficas(E, N, zona, sur, el) {
+  const { a, f } = el, k0 = 0.9996;
+  const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const x = E - 500000, y = sur ? N - 1e7 : N;
+  // Latitud del pie de la perpendicular
+  const mu = (y / k0) / (a * (1 - e2/4 - 3*e2**2/64 - 5*e2**3/256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const p1 = mu + (3*e1/2 - 27*e1**3/32) * Math.sin(2*mu)
+                + (21*e1**2/16 - 55*e1**4/32) * Math.sin(4*mu)
+                + (151*e1**3/96) * Math.sin(6*mu)
+                + (1097*e1**4/512) * Math.sin(8*mu);
+  const s = Math.sin(p1), c = Math.cos(p1), t = Math.tan(p1);
+  const C1 = ep2 * c*c, T1 = t*t;
+  const N1 = a / Math.sqrt(1 - e2*s*s);
+  const R1 = a * (1 - e2) / Math.pow(1 - e2*s*s, 1.5);
+  const D = x / (N1 * k0);
+  const lat = p1 - (N1*t/R1) * (D**2/2
+    - (5 + 3*T1 + 10*C1 - 4*C1**2 - 9*ep2) * D**4/24
+    + (61 + 90*T1 + 298*C1 + 45*T1**2 - 252*ep2 - 3*C1**2) * D**6/720);
+  const lon0 = ((zona - 1) * 6 - 180 + 3) * Math.PI / 180;
+  const lon = lon0 + (D - (1 + 2*T1 + C1) * D**3/6
+    + (5 - 2*C1 + 28*T1 - 3*C1**2 + 8*ep2 + 24*T1**2) * D**5/120) / c;
+  return { lat, lon };
+}
+
+function geograficasAXYZ(lat, lon, h, el) {
+  const e2 = el.f * (2 - el.f);
+  const N = el.a / Math.sqrt(1 - e2 * Math.sin(lat)**2);
+  return {
+    X: (N + h) * Math.cos(lat) * Math.cos(lon),
+    Y: (N + h) * Math.cos(lat) * Math.sin(lon),
+    Z: (N * (1 - e2) + h) * Math.sin(lat)
+  };
+}
+
+function trasladar(P, dX, dY, dZ) {
+  // WGS84 = PSAD56 + traslación
+  return { X: P.X + dX, Y: P.Y + dY, Z: P.Z + dZ };
+}
+
+function xyzAGeograficas(P, el) {
+  const e2 = el.f * (2 - el.f);
+  const p = Math.hypot(P.X, P.Y);
+  const lon = Math.atan2(P.Y, P.X);
+  let lat = Math.atan2(P.Z, p * (1 - e2));
+  for (let i = 0; i < 8; i++) {          // iteración hasta converger
+    const N = el.a / Math.sqrt(1 - e2 * Math.sin(lat)**2);
+    lat = Math.atan2(P.Z + e2 * N * Math.sin(lat), p);
+  }
+  return { lat, lon };
+}
+
+function geograficasAUTM(lat, lon, zona, sur, el) {
+  const { a, f } = el, k0 = 0.9996;
+  const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const lon0 = ((zona - 1) * 6 - 180 + 3) * Math.PI / 180;
+  const s = Math.sin(lat), c = Math.cos(lat), t = Math.tan(lat);
+  const N = a / Math.sqrt(1 - e2*s*s), T = t*t, C = ep2*c*c, A = (lon - lon0) * c;
+  const M = a * ((1 - e2/4 - 3*e2**2/64 - 5*e2**3/256) * lat
+    - (3*e2/8 + 3*e2**2/32 + 45*e2**3/1024) * Math.sin(2*lat)
+    + (15*e2**2/256 + 45*e2**3/1024) * Math.sin(4*lat)
+    - (35*e2**3/3072) * Math.sin(6*lat));
+  const E = 500000 + k0 * N * (A + (1 - T + C) * A**3/6
+    + (5 - 18*T + T**2 + 72*C - 58*ep2) * A**5/120);
+  let Nn = k0 * (M + N * t * (A**2/2 + (5 - T + 9*C + 4*C**2) * A**4/24
+    + (61 - 58*T + T**2 + 600*C - 330*ep2) * A**6/720));
+  return { E, N: sur ? Nn + 1e7 : Nn };
+}
+
+
+function resaltar(el){
+  const re=/(\/\/[^\n]*)|(`[^`]*`|"[^"\n]*"|'[^'\n]*')|\b(const|let|function|return|for|if|else)\b|\b(\d+\.?\d*(?:e\d+)?)\b|\b(Math\.\w+|hypot)(?=\()/g;
+  el.innerHTML=el.textContent.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(re,(m,c,st,k,n,f)=>
+    c?'<span class="token comment">'+c+'</span>':st?'<span class="token string">'+st+'</span>':k?'<span class="token keyword">'+k+'</span>':n?'<span class="token number">'+n+'</span>':'<span class="token function">'+f+'</span>');
+}
+/* ---------- Presentación ---------- */
+const $ = id => document.getElementById(id);
+const deg = r => r * 180 / Math.PI;
+function dms(r) {
+  const d = Math.abs(deg(r)), g = Math.floor(d), m = Math.floor((d - g) * 60);
+  const s = ((d - g) * 60 - m) * 60;
+  return `${r < 0 ? "-" : ""}${g}° ${m}' ${s.toFixed(4)}"`;
+}
+const esc = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const res = rows => `<div class="res">${rows.map(([k, v]) => `<b>${k}</b><span>${v}</span>`).join("")}</div>`;
+
+function calcular() {
+  const E = +$("E").value, N = +$("N").value, zona = +$("Z").value, sur = $("H").value === "S";
+  const dX = +$("dX").value, dY = +$("dY").value, dZ = +$("dZ").value;
+
+  const g1 = utmAGeograficas(E, N, zona, sur, INT1924);
+  const p1 = geograficasAXYZ(g1.lat, g1.lon, 0, INT1924);
+  const p2 = trasladar(p1, dX, dY, dZ);
+  const g2 = xyzAGeograficas(p2, WGS84);
+  const u2 = geograficasAUTM(g2.lat, g2.lon, zona, sur, WGS84);
+  const dE = u2.E - E, dN = u2.N - N, dist = Math.hypot(dE, dN);
+  const f2 = v => v.toFixed(3);
+
+  const pasos = [
+    { t: "UTM PSAD56 a geográficas", fn: utmAGeograficas,
+      d: "Se invierte la proyección UTM con el elipsoide Internacional 1924 (a = 6 378 388 m, 1/f = 297).",
+      r: [["Entrada", `E ${f2(E)} · N ${f2(N)} · zona ${zona}${sur ? "S" : "N"}`], ["Latitud", dms(g1.lat)], ["Longitud", dms(g1.lon)]] },
+    { t: "Geográficas a coordenadas geocéntricas", fn: geograficasAXYZ,
+      d: "Se pasa de latitud y longitud a X, Y, Z en el mismo elipsoide, con altura elipsoidal h = 0.",
+      r: [["X", f2(p1.X)], ["Y", f2(p1.Y)], ["Z", f2(p1.Z)]] },
+    { t: "Traslación entre datums", fn: trasladar,
+      d: `Se suman los parámetros de traslación: ΔX = ${dX}, ΔY = ${dY}, ΔZ = ${dZ}.`,
+      r: [["X'", f2(p2.X)], ["Y'", f2(p2.Y)], ["Z'", f2(p2.Z)]] },
+    { t: "Geocéntricas a geográficas WGS84", fn: xyzAGeograficas,
+      d: "Se calculan latitud y longitud sobre el elipsoide WGS84 (a = 6 378 137 m, 1/f = 298,257223563).",
+      r: [["Latitud", dms(g2.lat)], ["Longitud", dms(g2.lon)]] },
+    { t: "Geográficas WGS84 a UTM", fn: geograficasAUTM,
+      d: "Se proyecta de nuevo a UTM, en la misma zona y hemisferio.",
+      r: [["Este", f2(u2.E)], ["Norte", f2(u2.N)]] }
+  ];
+
+  $("pasos").innerHTML = pasos.map((p, i) => `
+    <article class="step"><div class="badge">${i + 1}</div>
+      <h2>${p.t}</h2><p>${p.d}</p>${res(p.r)}
+      <details><summary>Ver el código</summary>
+      <pre class="language-javascript"><code class="language-javascript">${esc(p.fn.toString())}</code></pre></details>
+    </article>`).join("") + `
+    <article class="step"><div class="badge">✓</div>
+      <div class="panel final"><h2>Resultado en WGS84</h2>
+      ${res([["Este", f2(u2.E)], ["Norte", f2(u2.N)], ["Cambio en Este", f2(dE) + " m"], ["Cambio en Norte", f2(dN) + " m"], ["Desplazamiento", f2(dist) + " m"]])}
+      <span class="hint">El cambio de datum mueve el punto unos ${Math.round(dist)} m. Por eso no se pueden mezclar coordenadas de ambos sistemas.</span></div>
+    </article>`;
+  document.querySelectorAll("#pasos pre code").forEach(el => resaltar(el));
+}
+
+$("go").onclick = calcular;
+$("ej").onclick = () => { $("E").value = 277000; $("N").value = 8665000; $("Z").value = 18; $("H").value = "S";
+  $("dX").value = -279; $("dY").value = 175; $("dZ").value = -379; calcular(); };
+calcular();
+</script>
+</body>
+</html>
